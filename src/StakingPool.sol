@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 error ZERO_AMOUNT();
 error INSUFFICIENT_TOKEN();
@@ -10,12 +10,13 @@ error NO_REWARD();
 error INVALID_POOL();
 
 contract StakingPool {
+
     struct Pool {
-        IERC20 stakingToken;    // Token users stake
-        uint rewardRate;        // Reward rate per second
-        uint totalStaked;       // Total tokens staked in the pool
-        uint poolDuration;      // Pool staking duration in seconds
-        bool isActive;          // Pool status
+        IERC20 stakingToken;   
+        uint rewardRate;       
+        uint totalStaked;       
+        uint poolDuration;      
+        bool isActive;          
     }
 
     struct StakerData {
@@ -23,12 +24,13 @@ contract StakingPool {
         uint lastStakedTimestamp;
         uint reward;
     }
-
+    uint256 public MinimumStake=5;
     // Pool ID mapped to Pool information
-    mapping(uint => Pool) public pools;
+    mapping(uint256 => Pool) public pools;
     // Staker data for each user in each pool
-    mapping(uint => mapping(address => StakerData)) public stakers;
-    // Pool counter for managing pool IDs
+    mapping (address => mapping(uint256 => StakerData)) public stakers;
+    mapping(uint => uint) public test;
+
     uint public poolCount;
 
     // Events
@@ -61,7 +63,7 @@ contract StakingPool {
         pool.stakingToken.transferFrom(msg.sender, address(this), amount);
 
         // Update staker's data
-        StakerData storage staker = stakers[poolId][msg.sender];
+        StakerData storage staker = stakers[msg.sender][poolId];
         staker.reward += calculateReward(poolId, msg.sender);
         staker.totalStaked += amount;
         staker.lastStakedTimestamp = block.timestamp;
@@ -73,7 +75,7 @@ contract StakingPool {
 
     // Unstake tokens from a specific pool
     function unstake(uint poolId, uint amount) external {
-        StakerData storage staker = stakers[poolId][msg.sender];
+        StakerData storage staker = stakers[msg.sender][poolId];
         if (amount > staker.totalStaked) revert INSUFFICIENT_STAKED_TOKEN();
 
         Pool storage pool = pools[poolId];
@@ -90,7 +92,7 @@ contract StakingPool {
     // Calculate rewards for a user in a specific pool
     function calculateReward(uint poolId, address user) public view returns (uint) {
         Pool storage pool = pools[poolId];
-        StakerData storage staker = stakers[poolId][user];
+        StakerData storage staker = stakers[user][poolId];
 
         uint stakingDuration = block.timestamp - staker.lastStakedTimestamp;
         uint calculatedReward = (staker.totalStaked * pool.rewardRate) * stakingDuration / 1e18;
@@ -100,7 +102,7 @@ contract StakingPool {
 
     // Claim rewards from a specific pool
     function claimReward(uint poolId) external {
-        StakerData storage staker = stakers[poolId][msg.sender];
+        StakerData storage staker = stakers[msg.sender][poolId];
         uint reward = staker.reward + calculateReward(poolId, msg.sender);
 
         if (reward < 1) revert NO_REWARD();
@@ -116,7 +118,7 @@ contract StakingPool {
 
     // Fetch user's staking info for a specific pool
     function getStakeInfo(uint poolId, address user) external view returns (StakerData memory) {
-        return stakers[poolId][user];
+        return stakers[user][poolId];
     }
 
     // Pause a specific pool (Admin function)
